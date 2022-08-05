@@ -9,3 +9,6 @@
 
     SET FOREIGN_KEY_CHECKS = 1;
 ```
+### INSERT TO -> добавить в таблицу.
+
+### ORDER BY -> упорядочить по.
