@@ -128,6 +128,104 @@
     Представления создаются по разным причинам, в том числе и для того, что-бы скрыть столбцы от пользователей и упрастить сложные конструкции бaз данных.
 
 
+# Связи таблиц
 
+    Механизм связывания двух таблиц называется (соединением (join))
+
+    Пример запроса:
+```
+    SELECT customer.first_name, customer.last_name,
+    ->  time(rental.rental_date) rental_time
+    -> FROM customer
+    ->  INNER JOIN rental
+    ->  ON customer.customer_id = rental.costomer_id
+    -> WHERE date(rental.rental_date) = '2005-06-14';
+```
+    Пример Ответа:
+
+```
+    +------------+-----------+-------------+
+    | first_name | last_name | rental_time |
+    +------------+-----------+-------------+
+    | CATHERINE  | CAMPBELL  | 23:17:03    |
+    | JOYCE      | EDWARDS   | 23:16:26    |
+    | AMBER      | DIXON     | 23:42:56    |
+    | JEANETTE   | GREENE    | 23:54:46    |
+    | MINNIE     | ROMERO    | 23:00:34    |
+    | GWENDOLYN  | MAY       | 23:16:27    |
+    | SONIA      | GREGORY   | 23:50:11    |
+```
+
+# Определение псевдопимов таблиц.
+    Псевдоним -> сокращенное название таблици.
+
+    Пример запрова с псевданимами:
+```
+SELECT c.first_name, c.last_name,
+    -> time(r.rental_date) rental_time
+    -> FROM customer c
+    -> INNER JOIN rental r
+    -> ON c.customer_id = r.customer_id
+    -> WHERE date(r.rental_date) = '2005-06-14';
+```
+
+Аналогичный пример с ключевым словом AS:
+
+```
+SELECT с.first_name, c.last_name,
+    -> time(r.rental_date) rental_time
+    -> FROM customer AS c
+    -> INNER JOIN rental AS r
+    -> ON c.customer_id = r.customer_id
+    -> WHERE date(r.rental_date) = '2005-06-14';
+```
+
+# Предложение where:
+    Предложение where - это механизм фильтрации нежелательных строк из нашего результирующего набора.
+
+    Пример запроса с предложение WHERE:
+    ```
+    SELECT title
+    -> FROM film
+    -> WHERE rating = 'G' AND rental_duration >= 7;
+    ```
+    Ответ на запрос:
+```
+    +-------------------------+
+    | title                   |
+    +-------------------------+
+    | BLANKET BEVERLY         |
+    | BORROWERS BEDAZZLED     |
+    | BRIDE INTRIGUE          |
+    | CATCH AMISTAD           |
+    | CITIZEN SHREK           |
+    | COLDBLOODED DARLING     |
+    | CONTROL ANTHEM          |
+    ...
+```
+    Пример разделенного скобками '()' запроса:
+
+    ```
+    SELECT title, rating, rental_duration
+    -> FROM film
+    -> WHERE (rating = 'G' AND rental_duration >= 7)
+    ->  OR (rating = 'PG-13' AND rental_duration < 4);
+    ```
+# Предложение order by
+    Предложение order by -> это механизм для сщртировки вашего результируещего набора с использованием любого необратимого столбца данных или выражения на основе данных столбца.
+
+    Пример Запроса:
+    ```
+    SELECT c.first_name, c.last_name,
+    ->  time(r.rental_date) rental_tame
+    -> FROM customer c
+    -> INNER JOIN rental r
+    -> ON c.customer_id = r.customer_id
+    -> WHERE date(r.rental_date) = '2005-06-14';
+    ```
+    Ответ на запрос:
+    ```
+    стр 88.
+    ```
 
 
