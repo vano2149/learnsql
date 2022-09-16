@@ -435,4 +435,156 @@ SELECT с.first_name, c.last_name,
     -> WHERE rturn_date IS NULL
     -> OR return_date NOT BERWEEN '2005-05-01' AND '2005-09-01';
     ```
-Проверь свои знания задачки 111 стр.
+
+# Глава 5
+## Запросы к нескольким таблицам.
+
+### Что такое соединение
+
+Соединение -> это механизм получения данных из двух таблиц.
+
+### Декартово произведение. 
+    Пример запроса:
+    ```
+    SELECT c.first_name, c.last_name, a.address
+    -> FROM customer c JOIN address a;
+    ```
+    Ответ:
+    ```
+    +----------+-----------+------- +
+    |first name | last name |address|
+    +----------+-----------+--------+
+    361197 rows in set (0.09 sec)
+    ```
+    По скольку в запросе не указанно, как именно должны быть соеденны таблици, сервер базы данных сгенерировал декартово произведение, которое представляет собой все возможные сочетания записий из двух таблиц (599 клиектов * 603 адреса = 361197 сочитаний).
+    Этот тип соединения известен как перекрестное соединение (cross join).
+### Внутреннее соединение:
+    
+    Пример запроса:
+    ```
+    SELECT c.first_name, c.last_name, a.address
+    -> FROM customer c JOIN address a
+    ->  ON c.address_id = a.address_id;
+    ```
+    Благодоря предложению ON которое указывает серверу необходимоть соединение таблиц costomer b address, использую столбец address_id мы молучаем из 361197 строк 599.
+
+    Пример запроса с внутренним соединением:
+    ```
+    SEECT c.first_name, c.last_name, a.address
+    -> FROM customer c INNER JOIN address a
+    ->  ON c.address_id = a.address_id;
+    ```
+    INNER JOIN -> внутреннее соединение.
+
+### Синтаксис соединения ANSI:
+    страница 120!
+    Пример запросa:
+    ```
+    SELECT c.first_name, c.last_name, a.address
+    -> FROM customer c INNER JOIN address a
+    -> ON c.address_id = a.address_id
+    -> WHERE a.postal_code = 52137;
+    ```
+
+### Соединение трех и более стр.
+    Пример запроса: 
+    ```
+    SELECT c.first_name, c.last_name, ct.city
+    ->  FROM customer c
+    ->  INNER JOIN address a
+    ->  ON c.address_id = a.address_id
+    ->  INNER city ct
+    ->  ON a.city_id = ct.city_id;
+
+    SELECT c.first_name, c.last_name, ct.city
+    -> FROM city ct
+    -> INNER JOIN address a
+    -> ON a.city_id = ct.city_id
+    -> INNER JOIN customer c
+    -> ON c.address_id = a.address_id;
+
+    SELECT c.first_name, c.last_name, ct.city
+    -> FROM address a
+    -> ON a.city_id = ct.city_id
+    -> INNER JOIN customer c
+    -> ON c.address_id = a.address_id;
+    ```
+
+### Использование подзапросов в качестве таблиц.
+    Пример Запроса: 
+    ```
+    SELECT c.first_name, c.last_name, addr.address, addr.city
+    ->  FROM customer c
+    ->  INNER JOIN
+    ->      (SELECT a.address_id, a.address, ct.city
+    ->          FROM address a
+    ->              INNER JOIN city ct 
+    ->              ON a.city_id = ct.city_id 
+    ->          WHERE a.district = 'California'
+    ->        ) addr
+    ->       ON c.address_id = addr.address_id;
+    ```
+    Подзапрос из предыдущего запроса 'Отработка самого по себе!':
+    ```
+    SELECT a.address_id, a.address, ct.city
+    ->  FROM address a
+    ->   INNER JOIN city ct
+    ->   ON a.city_id = ct.city_id
+    -> WHERE a.dictrict = 'california';
+    ```
+    Ответ на запрос: 
+    ```
+    +------------+------------------------+----------------+
+    | address_id | address                | city           |
+    +------------+------------------------+----------------+
+    |          6 | 1121 Loja Avenue       | San Bernardino |
+    |         18 | 770 Bydgoszcz Avenue   | Citrus Heights |
+    |         55 | 1135 Izumisano Parkway | Fontana        |
+    |        116 | 793 Cam Ranh Avenue    | Lancaster      |
+    |        186 | 533 al-Ayn Boulevard   | Compton        |
+    |        218 | 226 Brest Manor        | Sunnyvale      |
+    |        274 | 920 Kumbakonam Loop    | Salinas        |
+    |        425 | 1866 al-Qatif Avenue   | El Monte       |
+    |        599 | 1895 Zhezqazghan Drive | Garden Grove   |
+    +------------+------------------------+----------------+
+    ```
+### Использование одной таблици дважды:
+
+    Пример запроса:
+    ```
+    SELECT f.title
+    ->  FROM film f
+    ->  INNER JOIN film_actor fa
+    ->  ON f.film_id = fa.film_id
+    ->  INNER JOIN actor a
+    ->  ON fa.actor_id = a.actor_id
+    ->  WHERE ((a.first_name = 'CATE' AND a.last_name = 'MCQUEEN')
+    ->  OR (a.first_name = 'CUBA' AND a.last_name = 'BIRCH'));
+    ```
+    Запрос который возвращает фильмы в которых снялись два актера:
+    ```
+    SELECT f.title
+    -> FROM film f
+    -> INNER JOIN film_actor fa1
+    -> ON f.film_id = fa1.film_id
+    -> INNER JOIN actor a1
+    -> ON fa1.actor_id = a1.actor_id
+    -> INNER JOIN actor a2
+    -> ON fa2.actor_id = a2.actor_id
+    -> WHERE (a1.first_name = 'CATE' AND a1.last_name = 'MCQUEEN')
+    ->  AND (a2.firts_name = 'CUBA' AND a2.last_name = 'BRICH');
+    ```
+    Ответ:
+    ```
+    +------------------+
+    | title            |
+    +------------------+
+    | BLOOD ARGONAUTS  |
+    | TOWERS HURRICANE |
+    +------------------+
+    ```
+### Самосоединение:
+
+    самоссылающийся внешний ключ -> это означает что в таблици имеется столбецб ссылающийся на первичный ключ в тойже таблице.
+
+Страница 126!
