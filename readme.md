@@ -587,4 +587,146 @@ SELECT с.first_name, c.last_name,
 
     самоссылающийся внешний ключ -> это означает что в таблици имеется столбецб ссылающийся на первичный ключ в тойже таблице.
 
-Страница 126!
+### Проверь знание ЗАДАЧКИ!
+
+    № 5.1
+    ```
+    SELECT c.first_name, c.last_name, a.address, ct.city
+    ->  FROM customer c
+    ->  INNER JOIN address a
+    ->  ON c.address_id = a.address_id
+    ->  INNER JOIN city ct
+    ->  ON a.city_id = ct.city_id
+    -> WHERE a.district = 'California';
+    ```
+
+    Ответ на запрос:
+
+    ```
+    +------------+-----------+------------------------+----------------+
+    | first_name | last_name | address                | city           |
+    +------------+-----------+------------------------+----------------+
+    | PATRICIA   | JOHNSON   | 1121 Loja Avenue       | San Bernardino |
+    | BETTY      | WHITE     | 770 Bydgoszcz Avenue   | Citrus Heights |
+    | ALICE      | STEWART   | 1135 Izumisano Parkway | Fontana        |
+    | ROSA       | REYNOLDS  | 793 Cam Ranh Avenue    | Lancaster      |
+    | RENEE      | LANE      | 533 al-Ayn Boulevard   | Compton        |
+    | KRISTIN    | JOHNSTON  | 226 Brest Manor        | Sunnyvale      |
+    | CASSANDRA  | WALTERS   | 920 Kumbakonam Loop    | Salinas        |
+    | JACOB      | LANCE     | 1866 al-Qatif Avenue   | El Monte       |
+    | RENE       | MCALISTER | 1895 Zhezqazghan Drive | Garden Grove   |
+    +------------+-----------+------------------------+----------------+
+    ```
+    № 5.2
+
+    ```
+    SELECT f.title
+    -> FROM film f
+    ->  INNER JOIN film_actor fa
+    ->  ON f.film_id = fa.film_id
+    ->  INNER JOIN actor a
+    ->  ON fa.actor_id = a.actor_id
+    ->  WHERE a.first_name = 'JOHN';
+    ```
+
+
+
+# Глава 6. Работа с множествами.
+
+### Теория множеств на практике.
+
+    ```
+    SELECT 1 num, 'abc' str
+    ->  UNION
+    ->  SELECT 9 num, 'xyz' str;
+    ```
+* Данный запрос сообщяет серверу что необходимо объединить два столбца.
+    (UNION) -> Оператор объединения множества.
+
+    Ответ на запрос:
+    ```
+    +-----+-----+
+    | num | str |
+    +-----+-----+
+    |   1 | abc |
+    |   9 | xyz |
+    +-----+-----+
+    ```
+
+## Операторы для работы с множествами.
+
+### Оператор Union.
+
+    Операторы UNION и UNION ALL позволяет объединить несколько наборов данных. Разница между ними заключается в том, что UNION сортирует объединенный набор и удаляет дубликаты, тогда как UNION ALL не делает этого.
+    Первая версия запроса:
+    ```
+    SELECT 'CUST' typ, c.first_name, c.last_name
+    ->  FROM customer c
+    ->  UNION ALL
+    ->  SELECT 'ACTR' typ, a.first_name, a.last_name
+    ->  FROM actor a;
+    ```
+
+    Второй пример запроса с идентичными предложениями.
+
+    ```
+    SELECT 'ACTR' typ, a.first_name, a.last_name
+    ->  FROM actor a
+    ->  UNION ALL
+    ->  SELECT 'ACTR' typ, a.first_name, a.last_name
+    ->  FROM actor a;
+    ```
+
+    Вот составной запрос возвращающий повторяющиеся данные:
+    ```
+    SELECT c.first_name, c.last_name
+    -> FROM customer c
+    -> WHERE c.first_name LIKE 'J%' AND c.last_name LIKE 'D%'
+    -> UNION ALL
+    -> SELECT a.first_name, a.last_name
+    -> FROM actor a
+    -> WHERE a.first_name LIKE 'J%' AND a.last_name LIKE 'D%';
+    ```
+    Ответ на запрос:
+
+    ```
+    +------------+-----------+
+    | first_name | last_name |
+    +------------+-----------+
+    | JENNIFER   | DAVIS     |
+    | JENNIFER   | DAVIS     |
+    | JUDY       | DEAN      |
+    | JODIE      | DEGENERES |
+    | JULIANNE   | DENCH     |
+    +------------+-----------+
+    ```
+    Запрос без дубликатов (UNION):
+
+    ```
+    SELECT c.first_name, c.last_name
+    ->  FROM customer c
+    ->  WHERE c.first_name LIKE 'J%' AND c.last_name LIKE 'D%'
+    ->  UNION
+    ->  SELECT a.first_name, a.last_name
+    ->  FROM actor a
+    ->  WHERE a.first_name LIKE 'J%' AND a.last_name LIKE 'D%';
+    ```
+    Ответ на запрос:
+
+    ```
+    +------------+-----------+
+    | first_name | last_name |
+    +------------+-----------+
+    | JENNIFER   | DAVIS     |
+    | JUDY       | DEAN      |
+    | JODIE      | DEGENERES |
+    | JULIANNE   | DENCH     |
+    +------------+-----------+
+    ```
+
+## Правила применения операторов для работы с множествами.
+
+### 1. Сортировка результатов составного запроса.
+
+    стр 141!
+
