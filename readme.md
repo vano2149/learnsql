@@ -728,5 +728,292 @@ SELECT с.first_name, c.last_name,
 
 ### 1. Сортировка результатов составного запроса.
 
-    стр 141!
+    Пример запроса:
+    ```
+    SELECT a.first_name fname, a.last_name lname
+    ->  FRPM actor a
+    ->  WHERE a.first_name LIKE 'J%' AND a.last_name LIKE 'D%'
+    ->  UNION ALL
+    ->  SELECT c.first_name, c.last_name
+    ->  FROM customer c
+    ->  WHERE c.first_name LIKE 'J%' AND c.last_name LIKE 'D%'
+    ->  ORDER BY lname, fname;
+    ```
+    В составном запросе часто совпадают имена столбцов, но эо не обязательное условие.
+
+### 2. Приоритеты операций над множествами.
+
+    Пример запроса:
+    ```
+    SELECT a.first_name, a.last_name
+    ->  FROM actor a
+    ->  WHERE a.first_name LIKE 'J%' AND a.last_name LIKE 'D%'
+    ->  UNION ALL
+    ->  SELECT a.first_name, a.last_name
+    ->  FROM actor a
+    ->  WHERE a.first_name LIKE 'M%' AND a.last_name LIKE 'T%'
+    ->  UNION
+    ->  SELECT c.first_name, c.last_name
+    ->  FROM customer c
+    ->  WHERE c.first_name LIKE 'J%' AND c.last_name LIKE 'D%';
+    ```
+    Этот пример составного запроса возвращает набор неуникальных имен.
+
+    ```
+    SELECT a.first_name, a.last_name
+    ->  FROM actor a
+    ->  WHERE a.first_name LIKE 'J%' AND a.last_name LIKE 'D%'
+    ->  UNION
+    ->  SELECT a.first_name, a.last_name
+    ->  FROM actor a
+    ->  WHERE a.first_name LIKE 'M%' AND a.last_name LIKE 'T%'
+    ->  UNION ALL
+    ->  SELECT c.first_name, c.last_name
+    ->  FROM customer c
+    ->  WHERE c.first_name LIKE 'J%' AND c.last_name LIKE 'D%';
+    ```
+
+### Проверь сои знания:
+    Напишите составной запрос, который ноходит именя и  фамилии всех актеров и клиентов, чьи фамилии начинаются с буквы L.
+
+    ```
+    SELECT a.first_name, a.last_name
+    ->  FROM actor a
+    ->  WHERE a.last_name LIKE 'L%'
+    ->  UNION ALL
+    ->  SELECT c.first_name, c.last_name
+    ->  FROM customer c
+    ->  WHERE c.last_name LIKE 'L%';
+    ```
+
+# Глава 7: Генерация, обработка и переобразование данных.
+
+
+* CHAR -> Хранит строки фиксированной длинны с заполнением знако мест пробелами.
+
+* varchar -> Содержит строки переменной длинны. MySQL позволяет использовать в столбце varchar до 65535 символов.
+
+* text -> Содержит очень большие строки  переменной длинны (обычно в этом контексте именнуемые документами).
+
+    MySQL имеет несколько текстовых типов:
+    * tinytext
+    * text
+    * mediumtext
+    * longtext
+
+### Пример запроса на создания таблицы:
+    ```
+    CREATE TABLE string_tbl
+    -> (char_fld CHAR(30),
+    -> vchar_fld VARCHAR(30),
+    -> text_fld TEXT);
+    ```
+## Генерация строк:
+    INSERT INTO string_tbl (char_fld, vchar_fld, text_fld)
+    ->  VALUE ('This is char data',
+    ->  'This is varchar data',
+    ->  'This is text data');
+
+## Включение одинаковых кавычек:
+* Пример запроса:
+    Просто ставим еще один опостров.
+    ```
+    UPDATE string_tg1
+    -> SET text_fld = 'This string didn''t work, but it does now';
+    ```
+* Для извлечения строки и использования в другой программе, используем функцию quote()
+    Пример запроса с использованием функции quote():
+    ```
+    SELECT quote(text_fld)
+    ->  FROM string_tg1;
+    ```
+
+## Включение сппециальных символов
+
+* Пример запроса:
+    ```
+    SELECT 'abcdefg', CHAR(97,98,99,100,101,102,103);
+    ```
+    CONCAT() -> Функция конкатинации строк.
+    ascii()  -> Функция возвращающая номер символа в ascii кодировке.
+    char()   -> Функция преобразующая номер символа в символ.
+
+## Манипуляция строками.
+* Удаляем и Наполняем зановов таблицу:
+    ```
+    DELETE FROM string_tb1;
+
+    INSERT INTO string_tg1 (char_fld, vchar_fld, text_fld)
+    ->  VALUE ('This string is 28 characters',
+    ->      'This string is 28 characters',
+    ->      'This string is 28 characcters');
+    ```
+
+### Строковые функции, возвращающие числовые значения.
+    Length() -> Функция возвращающая кол-во элементов в строке.
+* Пример запроса:
+    ```
+    SELECT LENGTH(char_fld) char_length,
+    ->  LENGTH(vchar_fld) varchar_length,
+    ->  LENGTH(text_fld) text_length
+    ->FROM string_tg1;
+    ```
+
+    position() -> Функция возвращающая местоположение подстрок внутри строки.
+
+* Пример запроса:
+    ```
+    SELECT POSITION('characters' IN vchar_fld)
+    -> FROM string_tg1;
+    ```
+    
+    Для поиска с определенной позииции отличающейся от первой использует функцию locate().
+
+* Пример запроса:
+    ```
+    SELECT LOCATE('is', vchar_fld, 5)
+    -> FROM string_tg1;
+    ```
+Еще одна функция которая примимает числовые значения, - это функция сравнения строк strcmp() -> данная функция не чувствительна к регистру.
+
+    Она принимает в качестве фргументов две строки и возвращает одно из следующих значений:
+* -1 -> если первая строка предшествует второй в порядке сортировки;
+*  0 -> если строки идентичны;
+*  1 -> если первая строка в порядке сортировки идет после второй.
+Следующий запрос выполняет шесть сравнения между пятью разными строками.
+
+    ```
+    SELECT STRCMP('12345', '12345') 12345_12345,
+    -> STRCMP('abcd', 'xyz') abcd_xyz,
+    -> STRCMP('abcd', 'QRSTUV') abcd_QRSTUV,
+    -> STRCMP('qrstuv', 'QRSTUV') qrstuv_QRSTUV,
+    -> STRCMP('12345', 'xyz') 12345_xyz,
+    -> STRCMP('xyz', 'qrstuv') xyz_qrstuv;
+    ```
+    Ответ на запрос:
+    ```
+    +-------------+----------+-------------+---------------+-----------+------------+
+    | 12345_12345 | abcd_xyz | abcd_QRSTUV | qrstuv_QRSTUV | 12345_xyz | xyz_qrstuv |
+    +-------------+----------+-------------+---------------+-----------+------------+
+    |           0 |       -1 |          -1 |             0 |        -1 |          1 |
+    +-------------+----------+-------------+---------------+-----------+------------+
+    1 row in set (0.00 sec)
+    ```
+    Пример запроса с select и регулярки:
+
+    ```
+    SELECT name, name, LIKE '%y' ends_in_y
+    ->  FROM category;
+    ```
+    Если имя заканчиваается буквой 'y' -> 1, в противном случае -> 0.
+    
+    Второй столбец этого запроса возвращает 1, если значение хранится в столбце name, соответствует данному регулярному выражению.
+    ```
+    SELECT name, name REGEXP 'y$' ends_in_y
+    ->  FROM category;
+    ```
+
+## Строковые функции, возвращающие строки.
+
+* Функция concat() -> Добавить к хронмой строке дополнителные символы.
+    ```
+    UPDATE string_tg1
+    -> SET text_fld = CONCAT(text_fld, ', but now it is longer');
+    ```
+* Содержимое строки выглядит вот так:
+    ```
+    SELECT text_fld
+    -> FROM string_tg1;
+    ```
+    ```
+    +-----------------------------------------------------+
+    | text_fld                                            |
+    +-----------------------------------------------------+
+    | This string was 29 characters, but now it is longer |
+    +-----------------------------------------------------+
+    ```
+* Построение строки из отдельных фрагментов данных.
+    ```
+    SELECT concat(first_name, ' ', last_name,
+    ->  ' has been a customer since ',
+    ->  date(create_date)) cust_narrative
+    ->  FROM customer; 
+    ```
+
+    Функция insert которая принемает четыре аргуманта:
+    Исходную строку -> 'goodbye world'
+    Позицию с которой следует начать вставку -> 9
+    Кол-во вставляемых символов -> 0
+    Вставляемую строку -> 'cruel '
+
+    Пример запроса:
+    ```
+    SELECT INSERT('goodbye world', 9, 0, 'cruel ') string;
+    ```
+
+    Если третий аргумант больше нуля, то он указывает на кол-во элементов которые заменяются вставляемой строкой.
+    ```
+    SELECT INSERT('goodbye world', 1, 7, 'hello') string;
+    ```
+    Придыдущий пример с использованием функции replase()
+    ```
+    SELECT REPLACE('goodbye world', 'goodbye', 'hello')
+    ->  FROM dual;
+    ```
+    По мимо свтавки символов в строку нам может потребоваться извлечение подстроки из строки.
+    В этом нам помможет функция substring()
+
+    ```
+    SELECT SUBSTRING('goodbye cruel world', 9, 5);
+    ```
+    Название книги ->  Джеймс Грофф, Пол Вайнберг, Эндрю Оппель. SQL. Полное руководство.— СПб. : ООО “Диалектика”, 2020.
+
+### Работа с числовыми данными.
+
+    Пример запроса:
+    ```
+    SELECT (37 * 59) / (78 - (8 * 6));
+    ```
+### Выполнение матаматических функций:
+
+    Остаток от делений:
+    ```
+    SELECT MOD(10, 4);
+    ```
+
+    ```
+    SELECT MOD(22.75, 5);
+    ```
+    Возведение в степень:
+    ```
+    SELECT POW(2, 8); -> Эквивалентко 2 в 8 степени.
+    ```
+    Функция pow() может быть удобным средством определения точности количества байтов в определенном объеме памяти.
+
+    ```
+    SELECT POW(2,20) kilobyte, POW(2,20) megabyte,
+    ->  POW(2,30) gigabyte, POW(2,40) terabyte;
+    ```
+    +----------+----------+------------+---------------+
+    | kilobyte | megabyte | gigabyte   | terabyte      |
+    +----------+----------+------------+---------------+
+    |     1024 |  1048576 | 1073741824 | 1099511627776 |
+    +----------+----------+------------+---------------+
+
+### Управление точночтью чисел.
+    Функция ceil -> округляет в большую сторону.
+    Функция floor -> округляет в меньшую сторону.
+    Функция round -> округляет к ближайшему целому числу.
+
+    Второй параметр round говорит нам о том с какой точностью округлить.
+    Пример запроса:
+    ```
+    SELECT ROUND(72.0909, 1), ROUND(72.0909, 2), ROUND(72.0909, 3);
+    ```
+    +------------------+------------------+------------------+
+    | ROUND(72.0909,1) | ROUND(72.0909,2) | ROUND(72.0909,3) |
+    +------------------+------------------+------------------+
+    |             72.1 |            72.09 |           72.091 |
+    +------------------+------------------+------------------+
+    1 row in set (0.00 sec)
 
