@@ -1481,5 +1481,585 @@ return_date и добавляет к нему 3 часа 27 минут и 11 с�
     ->   FROM country
     ->   WHERE country IN ('Canada','Mexico'));
     ```
-    Page -> 201
+### Оператор all
+    Оператор all позваляет срвнить отдельное зачение с каждым значением в наборе.
 
+    ```
+    SELECT first_name, last_name
+    ->  FROM customer
+    ->  WHERE customer <> ALL
+    ->  (SELECT customer_id
+    ->  FROM payment
+    ->  WHERE amount = 0);
+    ```
+    Подзапрос возвращает набор индентификаторов клиентов, которые заплатили 0 долларов за прокат фильма. А запров возвращает имена всех клиентов, чьи идентификаторы не указанны в результирующем наборе.
+    Пример запроса без all
+    ```
+    SELECT first_name, last_name
+    ->  FROM customer
+    ->  WHERE customer_id NOT IN
+    ->  (SELECT customer_id
+    ->   FROM payment
+    ->   WHERE amount = 0);
+    ```
+    Вот еще один пример запроса с использование оператора all
+    ```
+    SELECT customer_id, count(*)
+    ->  FROM rental
+    ->  GROUP BY customer_id
+    ->  HAVING count(*) > ALL
+    ->   (SELECT count(*)
+    ->     FROM rental r
+    ->      INNER JOIN customer c
+    ->      ON r.customer_id = c.customer_id
+    ->      INNER JOIN address a
+    ->      ON c.address_id = a.address_id
+    ->      INNER JOIN city ct
+    ->      ON a.city_id = ct.city_id
+    ->      INNER JOIN country co
+    ->      ON ct.country_id = co.country_id
+    ->   WHERE co.country_id IN ('United States', 'Mexico', 'Canada')
+    ->   GROUP BY r.customer_id
+    ->);
+    ```
+    Подзапрос в этом примере общеекол-во прокатов фильмов для каждого клиента в Севереной Амекике, a содержащий запрос возвращает всех клиентов, общее количество прокатов фильмов у которых превышает значение у лубого из североамериканских клиентов.
+
+### Оператор Any.
+    ```
+    SELECT customer_id, sum(amount)
+    ->  FROM payment
+    ->  GROUP BY customet_id
+    ->  HAVING sum(amount) > ANY
+    ->  (SELECT sum(p.amount)
+    ->   FROM payment p
+    ->      INNER JOIN customer c
+    ->      ON p.customer_id = c.customer_id
+    ->      INNER JOIN address a
+    ->      ON c.address_id = a.address_id
+    ->      INNER JOIN city ct
+    ->      ON a.city_id = ct.city_id
+    ->      INNER JOIN country co
+    ->      ON ct.country_id = co.country_id
+    -> WHERE co.country IN ('Bolivia', 'Paraguay', 'Chile')
+    -> GROUP BY co.country
+    ->);
+    ```
+    Подзапрос возвращает общую стоимость проката фильмов для всех клиентов в Боливии, Парагвае и Чили, a содержащий запрос возвращает всех клиентов , которые изрсходовали суммуб превышающую разходы клиентов, хотя бы из этих трех стран.
+
+### Многостолбцевые подзапросы.
+    ```
+    SELECT fa.actor_id, fa.film_id
+    ->  FROM film_actor fa
+    ->  WHERE fa.actor_id IN
+    ->  (SELECT actor_id FROM actor WHERE last_name = 'MONROE')
+    ->  AND fa.film_id IN
+    ->  (SELECT film_id FROM film WHERE rating = 'PG');
+    ```
+    Эта версия запроса выполняет ту же функцию, что и в предыдущем примере, но с использованием одного подзапроса, который возвращает два столбца вместо двух подзапросов,каждый из которых возвращает один столбец.
+
+### Коррелированные подзапросы.
+    Коррелированный подзапрос зависит от содержащий его инструкции.
+
+    Следующий подзапрос использует коррелированный подзапрос для подсчета кол-во прокатов фильмов для каждого клиента, a затем сожержащий запрос извлекает тех клиентовб которые взяли на прокат ровно 20 фильмов.
+
+    ```
+    SELECT c.first_name, c.last_name
+    ->  FROM customer c
+    ->  WHERE 20 =
+    ->  (SELECT count(*) FROM rental r
+    ->   WHERE r.customer_id = c.customer_id);
+    ```
+    Запрос с условием диапозона:
+    ```
+    SELECT c.first_name, c.last_name
+    -> FROM customer c
+    -> WHERE
+    -> (SELECT sum(p.amount) FROM payment p
+    -> WHERE p.customer_id = c.customer_id)
+    -> BETWEEN 180 AND 240;
+    ```
+    Этот вариант запроса возвращает всех клиентов чьи общие платежи за все прокаты фильмов состовляют от 180 до 240 долларов.
+
+### Оператор exists
+
+    Оператор exists используется, когда необходимо опредилить существование связи безотносительно к колличеству.
+```
+SELECT c.first_name, c.last_name
+->  FROM customer c
+->  WHERE EXISTS
+->  (SELECT 1 FROM rental r
+->  WHERE r.customer_id = c.customer_id
+->  AND date(r.rental_date) < '2005-05-25');
+```
+    Использую оператор exists, ваш подзапрос может возвращать нуль, одну строку или несколькоб и условие просто проверяетб вернул ли подзапрос хотя бы одну строку.
+
+
+```
+SELECT c.first_name, c.last_name
+->  FROM customer c
+->  WHERE EXISTS
+->  (SELECT r.rental_date, r.customer_id, 'ABCD' str, 2*3/7 nmbr
+->  FROM rental r
+->   WHERE r.customer_id = c.customer_id
+->   AND date(r.rental_date) < "2005-05-25");
+```
+    При использовании exists принято указывать либо select 1 либо select *
+
+    Вы так-же можете использовать not exixst для отбора подзапросов, которые не возвращают строки, как показанно ниже.
+```
+SELECT a.first_name, a.last_name
+->  FROM actor a
+->  WHERE NOT EXISTS
+->  (SELECT 1
+->   FROM film_actor fa
+->      INNER JOIN film f ON f.film_id = fa.film_id
+->   WHERE fa.actor_id = a.actor_id
+->      AND f.rating = 'R');
+```
+    Этот запрос находит всех актерев которые никогда не снималить в фильмах с рейтингом "R".
+
+### Работа с данными с помощью коррелированных подзапросов.
+    Коррелированные рапросы можно использовать инструкции update, delete, insert
+    Вот пример коррелилованного подсапроса, используемого для изменения столбца last_update в таблице customer.
+    ```
+    UPDATE customer c
+    ->  SET c.last_update =
+    ->  (SELECT max(r.rental_date) FROM rental r
+    ->   WHERE r.customer_id = c.customer_id);
+    ```
+    Эта функция изменит каждуэ строку в таблице клиентов (Поскольку в ней нет предложения where)
+
+    ```
+    UPDATE customer c
+    ->  SET c.last_update =
+    ->  (SELECT max(r.rental_date) FROM rental r
+    ->      WHERE r.customer_id = c.customer_id)
+    ->  WHERE EXISTS
+    -> (SELECT 1 FORM rental r
+    ->  WHERE r.customer_id = c.customer_id);
+    ```
+    ```
+    DELETE FROM customer c
+    -> WHERE 365 < ALL
+    ->  (SELECT datediff(now(), r.rental_date) days_since_last_rental
+    ->  FROM rental
+    ->  WHERE r.customer_id = c.customer_id);
+    ```
+
+## Применение подзапросов
+### Подзапросы как источник данных
+
+    ```
+    SELECT c.first_name, c.last_name,
+    ->  pymnt.num_rentals, pymnt.tot_payments
+    ->FROM customer c
+    ->  INNER JOIN
+    ->  (SELECT customer_id,
+    ->      count(*) num_rentals, sum(amount) tot_payments
+    ->  FROM payment
+    ->  GROUP BY customer_id
+    ->  ) pymnt
+    ->  ON c.customer_id = pymnt.customer_id;
+    ```
+
+### Соединение данных.
+    Чтобы сформировать три группы в рамках одного запроса, требуется способ опредилить эти группы. Первым шагом является создание запроса, который генерирует определения групп:
+
+    ```
+    SELECT 'Small Fly' name, 0 low_limit, 74.99 higt_limit
+    ->  UNION ALL
+    ->  SELECT 'Average Joes' name, 75 low_limit, 149.99 hith_limit
+    ->  UNION ALL
+    -> SELECT 'Heavy Hitters' name, 150 low_limit, 9999999.99 high_limit;
+    ```
+    Каждый запрос извлекает три литерала, а результаты трех запросов объединяются для создания результирующего набора с тремя строками и тремя столбцами.
+    Теперь пропишим данный запрос в предложение FROM.
+
+    ```
+    SELECT pymnt_grps.name, count(*) num_customers
+    ->  FROM
+    ->    (SELECT customer_id,
+    ->      count(*) num_rentals, sum(amount) tot_payments
+    ->  FROM payment
+    ->  GROUP BY customer_id
+    ->  ) pymnt
+    ->  INNER JOIN
+    ->    (SELECT 'Small Fry', name, 0 low_limit, 74.99 high_limit
+    ->      UNION ALL
+    ->      SELECT 'Average Joes' name, 75 low_limit, 149.99 high_limit
+    ->      UNION ALL
+    ->      SELECT 'Heavy Hitters' name, 150 low_limit, 9999999.99 high_limit
+    ->  ) pymnt_grps
+    ->   ON pymnt.tot_payments
+    ->      BETWEEN pymnt_grps.low_limit AND pymnt_grps.high_limit
+    ->  GROUP BY pymnt_grps.name;
+    ```
+    Предложение FROM содержит два подзапроса; первый подзапрос, с именем 
+    pymnt, возвращает общее кол-во прокатов фильмов и общие платяжи для каждого клиента, в то время как второй второй подзапрос б с именем pymnt_grps, генерирует три группы клиентов.
+
+### Подзапрсы, ориентированные на задачу.
+    ```
+    SELECT c.first_name, c.last_name, ct.city,
+    ->  sum(p.amount) tot_payments, count(*) tot_rentals
+    ->  FROM payments p
+    ->    INNER JOIN customer c
+    ->    ON p.customer_id = c.customer_id
+    ->    INNER JOIN address a
+    ->    ON c.address_id = a.address_id
+    ->    INNER JOIN city ct
+    ->    ON a.city_id =ct.city_id
+    ->  GROUP BY c.first_name, c.last_name, ct.city
+    ```
+    Таким образом мы можем выделить задачу создания групп в подсапрос, а затем присоединмть остальные три таблици к таблице, сгенеринной подзапросом.
+    ```
+    SELECT customer_id,
+    ->  count(*) tot_payments, sum(amount) tot_payments
+    ->  FROM payment
+    ->  GROUP BY customer_id;
+    ```
+
+    ```
+    SELECT c.first_name, c.last_name,
+    -> ct.city,
+    -> pymnt.tot_payments, pymnt.tot_rentals
+    -> FROM
+    -> (SELECT customer_id,
+    -> count(*) tot_rentals, sum(amount) tot_payments
+    -> FROM payment
+    -> GROUP BY customer_id
+    -> ) pymnt
+    -> INNER JOIN customer c
+    -> ON pymnt.customer_id = c.customer_id
+    -> INNER JOIN address a
+    -> ON c.address_id = a.address_id
+    -> INNER JOIN city ct
+    -> ON a.city_id = ct.city_id;
+    ```
+
+### Обобщенные табличные выражения:
+
+    CTE (Common table expressions) -> это именнованный подзапросб который который появляется в верхней части запроса в предложении with.
+    ```
+    WITH actors_s AS
+    -> (SELECT actor_id, first_name,last_name
+    -> FROM actor
+    -> WHERE last_name LIKE 'S%'
+    -> ),
+    -> actors_s_pg AS
+    -> (SELECT s.actor_id, s.first_name, s.last_name,
+    -> f.film_id, f.title
+    -> FROM actors_s s
+    -> INNER JOIN film_actor fa
+    -> ON s.actor_id = fa.actor_id
+    -> INNER JOIN film f
+    -> ON f.film_id = fa.film_id
+    -> WHERE f.rating = 'PG'
+    -> ),
+    -> actors_s_pg_revenue AS
+    -> (SELECT spg.first_name, spg.last_name, p.amount
+    -> FROM actors_s_pg spg
+    -> INNER JOIN inventory i
+    -> ON i.film_id = spg.film_id
+    -> INNER JOIN rental r
+    -> ON i.inventory_id = r.inventory_id
+    -> INNER JOIN payment p
+    -> ON r.rental_id = p.rental_id
+    -> )
+    -> SELECT spg_rev.first_name, spg_rev.last_name,
+    -> sum(spg_rev.amount) tot_revenue
+    -> FROM actors_s_pg_revenue spg_rev
+    -> GROUP BY spg_rev.first_name, spg_rev.last_name
+    -> ORDER BY 3 desc;
+    ```
+    Этот запрос вычисляет общий доход от проката тех фильмов с рейтингом
+PG, актерский состав которых включает актера, фамилия которого начинается с S. 
+Первый подзапрос (actors_s) находит всех актеров, чьи фамилии начинаются с S,
+второй подзапрос (actors_s_pg) соединяет этот набор данных
+с таблицей film и фильтрует фильмы с рейтингом PG, а третий подзапрос
+(actors_s_pg_revenue) соединяет этот набор данных с таблицей payment,
+чтобы узнать суммы, уплаченные за аренду любого из этих фильмов.
+Последний запрос просто группирует данные из actors_s_pg_revenue по имени/фамилии и суммирует доходы.
+
+
+### Подзапросы как генераторы выражений.
+    ```
+    SELECT
+    ->(SELECT c.first_name FROM customer c
+    ->  WHERE c.customer_id = p.customer_id
+    ->) first_name,
+    ->(SELECT c.last_name FROM customer c
+    ->  WHERE c.customer_id = p.customer_id
+    ->) last_name,
+    ->(SELECT ct.city
+    ->FROM customer c
+    ->INNER JOIN address a
+    -> ON c.address_id = a.address_id
+    ->INNER JOIN city ct
+    ->  ON a.city_id = ct.city_id
+    -> WHERE c.customer_id = p.customer_id
+    ->) city,
+    ->  sum(p.amount) tot_payments,
+    -> count(*) tot_rentals
+    ->  FROM payment p
+    -> GROUP BY p.customer_id;
+    ```
+
+К таблице customer выполняется три обращения, потому что скалярные
+подзапросы могут возвращать только один столбец и строку, поэтому, если
+нам нужны три столбца, связанные с клиентом, необходимо использовать
+три разных подзапроса.
+
+    ```
+    SELECT a.actor_id, a.first_name, a.last_name
+    ->  FROM actor a
+    ->  ORDER BY
+    ->  (SELECT count(*) FROM film_actor fa
+    ->   WHERE fa.actor_id = a.actor_id) DESC;
+    ```
+    Этот запрос использует коррелированный скалярный подзапрос в предложении order by только для возврата количества фильмов, и это значение
+    используется исключительно для сортировки.
+    Наряду с коррелированными скалярными подзапросами в инструкциях
+    select можно использовать некоррелированные скалярные подзапросы для
+    генерации значений для инструкции insert. Пусть, например, вы   собираетесь создать новую строку в таблице film actor и у вас имеются следующие данные:
+    • имя и фамилия актера;
+    • название фильма.
+
+    ```
+    INSERT INRO film_actor (actor_id, film_id, last_update)
+    ->VALUES (
+    ->  (SELECT actor_id FROM actor
+    ->  WHERE first_name = 'JENNIFER' AND last_name = 'DAVIS'),
+    ->  (SELECT film_id FROM film
+    ->  WHERE title = 'ACE GOLDFINGER'),
+    -> now()
+    ->);
+    ```
+
+### Упражнение 9.1
+    ```
+    SELECT title
+    -> FROM film
+    -> WHERE film_id IN
+    ->  (SELECT fc.film_id
+    ->      FROM film_categoty fc INNER JOIN category c
+    ->          ON fc.category_id = c.category_id
+    ->      WHERE c.name = 'Action');
+    ```
+### Упражнение 9.2
+    ```
+    SELECT f.title
+    -> FROM film f
+    ->  WHERE ESISTS
+    ->  (SELECT 1
+    ->   FROM film_categoty fc INNER JOIN category
+    ->      ON fc.category_id = c.category_id
+    ->   WHERE c.name = 'Action'
+    ->      AND fc.film_id = f.film_id);
+    ```
+### Упражнение 9.3
+    ```
+     SELECT actr.actor_id, grps.level
+    -> FROM
+    -> (SELECT actor_id, count(*) num_roles
+    -> FROM film_actor
+    -> GROUP BY actor_id
+    -> ) actr
+    -> INNER JOIN
+    -> (select 'Hollywood Star' level, 30 min_roles, 99999 max_roles
+    -> UNION ALL
+    -> SELECT 'Prolific Actor' level, 20 min_roles, 29 max_roles
+    -> UNION ALL
+    -> SELECT 'Newcomer' level, 1 min_roles, 19 max_roles
+    -> ) grps
+    -> ON actr.num_roles BETWEEN grps.min_roles AND grps.max_roles;
+    ```
+# Глава 10. Соединения
+
+### Внешние сщкдинения.
+
+    ```
+    SELECT f.film_id, f.title, count(*) num_copies
+    -> FROM film f
+    ->  INNER JOIN inventory i
+    ->      ON f.film_if = i.film_id
+    -> GROUP BY f.film_id, f.title;
+    ```
+Если вы хотите, чтобы запрос возвращал все 1000 фильмов, независимо от
+того, имеются ли соответствующие строки в таблице inventory, можете использовать внешнее соединение, которое, по сути, делает условие соединения
+необязательным:
+    ```
+    SELECT f.film_id, f.title, count(i.inventory_id) num_copies
+    -> FROM film f
+    ->   LEFT OUTER JOIN inventory i
+    ->      ON f.film_id = i.film_id
+    -> GROUP BY f.film_id, f.title;
+    ```
+    Запрос без внешнего соединения.
+    ```
+    SELECT f.film_id, f.title, i.inventory_id
+    -> FROM film f
+    ->      INNER JOIN inventory i
+    ->        ON f.film_id = i.film_id
+    ->  WHERE f.film_if BETWEEN 13 AND 15;
+    ```
+    Тот-же запрос с внешним соединением.
+    ```
+    SELECT f.first_id, f.title, i.inventory_id
+    -> FROM film f
+    ->  LEFT OUTER JOIN inventory i
+    ->      ON f.film_id = i.film_id
+    -> WHERE f.film_id BETWEEN 13 AND 15;
+    ```
+    Пример правого внешнего соединения вместо левого:
+    ```
+    SELECT f.film_id, f.title, i.inventory_id
+    -> FROM inventory i
+    ->   RIGTH OUTER JOIN film f
+    ->      ON f.film_id = i.film_id
+    -> WHERE f.film_id BETWEEN 13 AND 15;
+    ```
+    Заметим, что обе версии запроса выполняют внешнее соединение
+    ключевые слова left и right служат только для того, чтобы сообщить
+    серверу, в
+    какой таблице разрешено иметь пробелы в данных. Если вы хотите внешне
+    соединить таблицы А и В и хотите, чтобы в результирующем наборе
+    присут -
+    ствовали все строки из А (с дополнительными столбцами из В всякий
+    раз,
+    когда есть соответствующие данные), то можете указать либо A left
+    outer
+    join В, либо В right outer join А.
+
+
+### Трехсторонние внешнее соединение.
+
+    Внекоторых случаях может понадобиться внешнее соединение одной
+    таблици с двумя другими, аот пример:
+    ```
+    SELECT f.film_id, f.title, i.inventory_id, r.rental_date
+    ->  FROM film f
+    ->      LEFT OUTER JOIN inventory i
+    ->      ON f.film_id = i.film_id
+    ->      LEFT OUTER JOIN rental r
+    ->      ON i.inventory_id = r.inventory_id
+    ->  WHERE f.film_id BETWEEN 13 AND 15;
+    ```
+Результаты включают в себя все фильмы, имеющиеся в наличии, но у
+фильма Alice Fantasia в столбцах из обеих таблиц, соединенных внешним
+соединением, находятся значения null.
+
+### Перекрестные соединения:
+
+    ```
+    SELECT c.name category_name, lname language_name
+    ->  FROM category c
+    ->      CROSS JOIN language l;
+    ```
+    Этот запрос генерирует декартово произведение таблици category и language, в результате чего получается результирующий набор из 96 строк (16 строк category * 6 строк language)
+
+```
+SELECT days.dt, COUNT(r.rental_id) num_rentals
+    -> FROM rental r
+    -> RIGHT OUTER JOIN
+    -> (SELECT DATE_ADD('2005-01-01',
+    -> INTERVAL (ones.num + tens.num + hundreds.num) DAY) dt
+    -> FROM
+    -> (SELECT 0 num UNION ALL
+    -> SELECT 1 num UNION ALL
+    -> SELECT 2 num UNION ALL
+    -> SELECT 3 num UNION ALL
+    -> SELECT 4 num UNION ALL
+    -> SELECT 5 num UNION ALL
+    -> SELECT 6 num UNION ALL
+    -> SELECT 7 num UNION ALL
+    -> SELECT 8 num UNION ALL
+    -> SELECT 9 num) ones
+    -> CROOS JOIN
+    -> (SELECT 0 num UNION ALL
+    -> SELECT 10 num UNION ALL
+    -> SELECT 20 num UNION ALL
+    -> SELECT 30 num UNION ALL
+    -> SELECT 40 num UNION ALL
+    -> SELECT 50 num UNION ALL
+    -> SELECT 60 num UNION ALL
+    -> SELECT 70 num UNION ALL
+    -> SELECT 80 num UNION ALL
+    -> SELECT 90 num) tens
+    -> CROSS JOIN
+    -> (SELECT 0 num UNION ALL
+    -> SELECT 100 num UNION ALL
+    -> SELECT 200 num UNION ALL
+    -> SELECT 300 num) hundreds
+    -> WHERE DATE_ADD('2005-01-01',
+    -> INTERVAL (ones.num + tens.num + hundreds.num) DAY)
+    -> <'2006-01-01'
+    -> ) days
+    -> ON days.dt = date(r.rental_date)
+    -> GROUP BY days.dt
+    -> ORDER BY 1;
+```
+
+### Естественные соединения.
+    ```
+    SELECT cust.first_name, cust.last_name, date(r.rental_date)
+    ->  FROM
+    ->  (SELECT customer_id, first_name, last_name
+    ->  FROM customer
+    ->  ) cust
+    ->  NATURAL JOIN rental r;
+    ```
+### Упражнение 10.1
+    ```
+    SELECT c.customer_id, c.first_name, c.last_name
+    ->  FROM customer c
+    ```
+    Дописать!!!!
+    Page -> 238/
+
+# Условная логика:
+    Пример запроса с условным оператором.
+    ```
+    SELECT first_name, last_name,
+    ->  CASE
+    ->  WHEN active = 1 THEN 'ACTIVE'
+    ->  ELSE 'INACTIVE'
+    ->  END activity_type
+    ->  FROM customer;
+    ```
+## Вырахение CASE:
+
+### Поисковые выражения case:
+
+    Выше расположенный запрос являеся примером поискового выражения:
+    Ниже представлен пример поискового запроса "Не работает -> илюстрация!"
+    ```
+    CASE
+    -> WHEN category.name IN ('Children', 'Family', 'Sport', 'Animation')
+    -> THEN 'ALL Ages'
+    -> WHEN category.name = 'Horror'
+    -> THEN 'Adult'
+    -> WHEN category.name IN ('Music', 'Games')
+    -> THEN 'Teens'
+    -> ELSE 'Other'
+    -> END
+    ```
+    Вот еще одна версия показанного выше запроса, в которой
+    для возврата количество прокатов — но только для активных клиентов!
+    используется подзапрос:
+    ```
+    SELECT c.first_name, c.last_name,
+    ->  CASE
+    ->      WHEN active = 0 THEN 0
+    ->  ELSE
+    ->      (SELECT count(*) FROM rental r
+    ->       WHERE r.customer_id = c.customer_id)
+    ->  END num_rentals
+    ->  FROM customer c;
+    ```
+    Эта версия запроса использует коррелированный подзапрос для
+    получения количества прокатов для каждого активного клиента. В
+    зависимости от
+    процента активных клиентов использование этого подхода может быть
+    более
+    эффективным, чем соединение таблиц customer и rental и группировка по
+    столбцу customer_id.
