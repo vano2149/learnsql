@@ -2030,36 +2030,225 @@ SELECT days.dt, COUNT(r.rental_id) num_rentals
 
 ### Поисковые выражения case:
 
-    Выше расположенный запрос являеся примером поискового выражения:
-    Ниже представлен пример поискового запроса "Не работает -> илюстрация!"
-    ```
-    CASE
-    -> WHEN category.name IN ('Children', 'Family', 'Sport', 'Animation')
-    -> THEN 'ALL Ages'
-    -> WHEN category.name = 'Horror'
-    -> THEN 'Adult'
-    -> WHEN category.name IN ('Music', 'Games')
-    -> THEN 'Teens'
-    -> ELSE 'Other'
+Выше расположенный запрос являеся примером поискового выражения:
+Ниже представлен пример поискового запроса "Не работает -> илюстрация!"
+
+```
+CASE
+-> WHEN category.name IN ('Children', 'Family', 'Sport', 'Animation')
+-> THEN 'ALL Ages'
+-> WHEN category.name = 'Horror'
+-> THEN 'Adult'
+-> WHEN category.name IN ('Music', 'Games')
+-> THEN 'Teens'
+-> ELSE 'Other'
+-> END
+```
+
+Вот еще одна версия показанного выше запроса, в которой
+для возврата количество прокатов — но только для активных клиентов!
+используется подзапрос:
+```
+SELECT c.first_name, c.last_name,
+->  CASE
+->      WHEN active = 0 THEN 0
+->  ELSE
+->      (SELECT count(*) FROM rental r
+->       WHERE r.customer_id = c.customer_id)
+->  END num_rentals
+->  FROM customer c;
+```
+Эта версия запроса использует коррелированный подзапрос для
+получения количества прокатов для каждого активного клиента. В
+зависимости от
+процента активных клиентов использование этого подхода может быть
+более
+эффективным, чем соединение таблиц customer и rental и группировка по
+столбцу customer_id.
+
+### Простые выражения case:
+Пример синтаксиса выражени ```CASE```
+
+```
+CASE V0
+    WHEN V1 THEN E1
+    WHEN V2 THEN E2
+    ...
+    WHEN VN THEN EN
+    [ELSE ED]
+END
+```
+
+Пример простого выражения ```CASE```
+
+```
+CASE category.name
+WHEN 'Children 1
+THEN 'All Ages
+WHEN 'Family' THEN 'All Ages'
+WHEN 'Sports' THEN 'All Ages'
+WHEN 'Animation' THEN 'All Ages
+WHEN 'Horror' THEN 'Adult
+WHEN ’Music' THEN 'Teens’
+WHEN 'Games' THEN 'Teens'
+ELSE 'Other
+END
+```
+
+### Преобразование результирующего набора
+
+Пример запроса:
+
+```
+SELECT monthname(rental_date) rental_month,
+->  count(*) num_rentals
+->FROM rental
+->WHERE rental_date BETWEEN '2005-05-01' AND '2005-08-01'
+->GROUP BY monthname(rental_date);
+```
+Пример запроса в одну строку данных с тремя столбцами.
+
+```
+SELECT
+-> SUM(CASE WHEN monthname(rental_date) = "May" THEN 1
+->      ELSE 0 END) May_rentals,
+->SUM(CASE WHEN monthname(rental_date) = 'June' THEN 1
+->      ELSE 0 END) June_rentals,
+->SUM(CASE WHEN nomthname(rental_date) = "July" THEN 1
+->      ELSE 0 END) July_rentals
+->  FROM rental
+->  WHERE rental_date BETWEEN '2005-05-01' AND '2005-08-01';
+```
+### Проверка существования:
+
+Пример запроса проверки сущ.
+
+```
+SELECT a.first_name, a.last_name,
+->  CASE
+->      WHEN EXISTS (SELECT 1 FROM film_actor fa
+->      INNER JOIN film f ON fa.film_actor = f.film_id
+->      WHERE fa.actor_id = a.actor_id
+->          AND f.rating = 'G') THEN 'Y'
+->  ELSE 'N'
+->END g_actor,
+->  CASE
+->      WHEN EXISTS (SELECT 1 FROM film_actor fa
+->      INNER JOIN film ON fa.film_id = f.film_id
+->      WHERE fa.actor_id = a.actor_id
+->      and f.rating = 'PG') THEN 'Y'
+->  ELSE 'N'
+->END pg_actor,
+->  CASE
+->      WHEN EXIST (SELECT 1 FROM film_actor fa
+->      INNER JOIN film f ON fa.film_id = f.film_id
+->      WHERE fa.actor_id = a.actor_id
+->      AND f.rating = 'NC-17') THEN 'Y'
+->  ELSE 'N'
+->END nc17_actor
+->  FROM actor a
+->  WHERE a.last_name LIKE 'S%' OR a.first_name LIKE 'S%';
+```
+аждое выражение case включает коррелированный подзапрос к таблицам
+film_actor и film; один из них ищет фильмы с рейтингом G, второй —
+фильмы с рейтингом PG и третий — фильмы с рейтингом NC-17. Поскольку
+в каждом предложении when используется оператор exists, условия
+вычисляются как истинные, если актер появился как минимум в одном фильме
+с соответствующим рейтингом.
+
+выражение case используется для подсчета количества копий в прокате для
+каждого фильма, возвращая строки ' Out Of Stock ' (нет в прокате),
+Scarce ' (редкий),'Available ' (доступный) или ' Common ' (обычный (в
+большом количестве)):
+
+```
+SELECT f.title,
+->  CASE (SELECT count(*) FROM inventory i
+->      WHERE i.film_id = f.film_id)
+->  WHEN 0 THEN 'Out Of Stock'
+->  WHEN 1 THEN 'Scarce'
+->  WHEN 2 THEN 'Scarce'
+->  WHEN 3 THEN 'Available'
+->  WHEN 4 THEN 'Available'
+->  ELSE 'Common'
+->END film_availability
+->FROM film f
+->;
+```
+### Ошибка деления на нуль
+
+```
+SELECT 100/0;
+```
+Ответ сервера:
+```
++---------+
+| 100 / 0 |
++---------+
+|    NULL |
++---------+
+```
+Чтобы защитить свои расчеты от ошибок или, что еще хуже, от таинственным
+образом появляющихся значений null,следует “завернуть” все знаменатели в
+условную логику, как демонстрируется в следующем примере:
+
+Пример:
+```
+SELECT c.first_name, c.last_name,
+->  sum(p.amount) tot_payment_amt,
+->  count(p.amount) mun_payments,
+->  sum(p.amount) /
+->      CASE WHEN count(p.amount) = 0 THEN 1
+->          ELSE count(p.amount)
+->      END avg_payment
+->  FROM customer c
+->      LEFT OUTER JOIN payment p
+->      ON c.customer_id = p.customer_id
+->  GROUP BY c.first_name, c.last_name;
+```
+тот запрос вычисляет среднюю сумму платежа для каждого клиента.
+Поскольку некоторые клиенты могут быть новыми и еще не брали напрокат ни
+одного фильма, лучше включить выражение case, чтобы знаменатель никогда
+не был равен нулю.
+
+### Условные обновления:
+
+```
+UPDATE customer
+    -> SET active =
+    -> CASE
+    -> WHEN 90 <= (SELECT datediff(now(), max(rental_date))
+    -> FROM rental r
+    -> WHERE r.customer_id = customer.customer_id)
+    -> THEN 0
+    -> ELSE 1
     -> END
-    ```
-    Вот еще одна версия показанного выше запроса, в которой
-    для возврата количество прокатов — но только для активных клиентов!
-    используется подзапрос:
-    ```
-    SELECT c.first_name, c.last_name,
-    ->  CASE
-    ->      WHEN active = 0 THEN 0
-    ->  ELSE
-    ->      (SELECT count(*) FROM rental r
-    ->       WHERE r.customer_id = c.customer_id)
-    ->  END num_rentals
-    ->  FROM customer c;
-    ```
-    Эта версия запроса использует коррелированный подзапрос для
-    получения количества прокатов для каждого активного клиента. В
-    зависимости от
-    процента активных клиентов использование этого подхода может быть
-    более
-    эффективным, чем соединение таблиц customer и rental и группировка по
-    столбцу customer_id.
+    -> WHERE active = 1;
+```
+Этот оператор использует коррелированный подзапрос для определения
+количества дней с момента последнего взятия фильма напрокат для каждого
+клиента, и полученное значение сравнивается со значением 90; если
+возвращенное подзапросом значение равно 90 или больше, клиент помечается
+как неактивный.
+
+### Обратный вызов null:
+Page -> 250.
+
+```
+SELECT name,
+    -> CASE
+    -> WHEN name IN ('English', 'Italian', 'French', 'German')
+    -> THEN 'latin1'
+    -> WHEN name IN ('Japanese', 'Mandarin')
+    -> THEN 'utf8'
+    -> ELSE 'Unknown'
+    -> END character_set
+    -> FROM language;
+```
+
+Перепишите запрос так чтобы чтбы результирующий запрос содержал одну строку с 5-ю столбцами.
+```
+SELECT rating, count(*)
+-> FROM film
+-> GROUP BY rating;
+```
