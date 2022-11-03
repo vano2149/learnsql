@@ -2409,4 +2409,686 @@ COMMIT;
 * смотря на название, при создании точки сохранения ничего не сохраняется. В конечном итоге
 вы должны выполнить commit, если хотите, чтобы ваша транзакция стала постоянной.
 
-Page -> 262
+# Глава 13. Индексы и ограничения.
+
+### Индексы.
+
+```
+SELECT first_name, last_name,
+->  FROM customer
+->  WHERE last_name LIKE 'Y%';
+```
+Чтобы найти всех клиентов, чьи фамилии начинаются с Y, сервер должен посетить каждую строку 
+в таблице customer и проверить содержимое, столбца last_name; если фамилия начинается с Y,
+то строка добаляется к результирующему набору. Этот тип доступа известен как сканирование
+таблицы.
+
+    Индекс -> это механизм поиска конкретного объекта внутри ресурса. (Общий термин)
+
+    Индексы -> это специальные таблици, которые, в отличии от обычных таблиц данныхб
+    хранятся в определенном порядке. (Определение для бд)
+
+### Создания Индекса.
+
+Пример создания индекса в таблице Customer для колонки email.
+
+```
+ALTER TABLE customer
+->  ADD INDEX idx_email (email);
+```
+```
+CREATE INDEX idx_email
+-> ON customer (email); 
+```
+Удаление индекса:
+```
+ALTER TABLE customer
+->  DROP INDEX idx_email;
+```
+```
+DROP INDEX idx_email ON customer;
+```
+
+### Уникальные Индексы.
+
+Пример создания уникального индекса в таблице Customer для колонки email.
+
+```
+ALTER TABLE customer
+->  ADD UNIQUE idx_email (email);
+```
+```
+CREATE UNIQUE INDEX idx_email
+->  ON customer (email);
+```
+
+Теперь если мы попытаемся добавить пользователя с уже сущ. email-ом, бд вдросит исключение
+
+```
+INSERT INTO customer
+-> (store_id, first_name, last_name, email, address_id, active)
+->  VALUES
+->  (1, 'ALAN', 'KAHN', 'ALAN.KAHN@sakilacustomer.org', '394', 1);
+```
+```
+ERROR 1062 (23000): Duplicate entry 'ALAN.KAHN@sakilacustomer.org' for key 'customer.idx_email'
+```
+### Многостолбцовые индексы.
+
+Пример запроса:
+```
+ALTER TABLE customer
+->  ADD INDEX idx_full_name (last_name, first_name);
+```
+Этот индекс будет полезен для запросов, в которых указываются имя и фамилия,
+или просто фамилия, но будет бесполезен для запросов, в которых указывается
+только имя клиента.
+
+## Типы Индексов.
+    Индексирование — мощный инструмент , но, поскольку существует много
+разных типов данных, имеется не одна стратегия индексирования.
+
+### Ограничения.
+
+* Ограничение -> это просто определенные условия, накладываемые на один или несколько
+столбцев таблици. Имеются несколько различных типов ограниченийб в том числе следующие.
+
+* Ограничение первичного ключа -> Определяют столбцы, для которых гарантируется их уникальность в таблице.
+
+* Ограничение внешнего ключа -> Ограничевает содержимое одного или нескольких столбцов таким 
+образом, что они могут содержать только значение, найденные в столбце первичного ключа
+другой таблицы (могут также ограничеваться допустимые значения в других таблицах при
+установке правил update cascade и/или delete cascade)
+
+* Ограничения уникальности -> Ограничевают один или несколько столбцев таким образом, чтобы
+они содержали уникальные значения в таблице (ограничение первичного ключа -> частный случай ограничения уникальности.).
+
+* Проверочные ограничения -> Оганичивают допустимые значения для столбца.
+
+### Создание ограничения.
+
+```
+CREATE TABLE customer (
+customer_id SMALLINT UNSIGNED NOT NULL AUTO_INCREMENT,
+store_id TINYINT UNSIGNED NOT NULL,
+first_name VARCHAR(45) NOT NULL,
+last_name VARCHAR(45) NOT NULL,
+email VARCHAR(50) DEFAULT NULL,
+address_id SMALLINT UNSIGNED NOT NULL,
+active BOOLEAN NOT NULL DEFAULT TRUE,
+create_date DATETIME NOT NULL,
+last_update TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+ON UPDATE CURRENT_TIMESTAMP,
+PRIMARY KEY (customer_id) ,
+KEY idx_fk_store_id (store_id),
+KEY idx_fk_address_id (address_id),
+KEY idx_last_name (last_name),
+CONSTRAINT fk_customer_address FOREIGN KEY (address_id)
+REFERENCES address (address_id)
+ON DELETE RESTRICT ON UPDATE CASCADE,
+CONSTRAINT fk_customer_store FOREIGN KEY (store_id)
+REFERENCES store (store_id)
+ON DELETE RESTRICT ON UPDATE CASCADE
+)ENGINE=InnoDB DEFAULT CHARSET=utf8;
+```
+
+Невозможно удалить или обновить родительскую строку: нарушение ограничения
+внешнего ключа.
+
+### Глава 14. Представления.
+
+Представление -> это просто механизм запроса данных. В отличие от таблицб представления не
+включают хранилище данных;
+
+Пример создания представления:
+```
+CREATE VIEW customer_vw
+    -> (customer_id,
+    -> first_name,
+    -> last_name,
+    -> email
+    -> )
+    -> AS
+    -> SELECT
+    -> customer_id,
+    -> first_name,
+    -> last_name,
+    -> concat(substr(email,1,2), '*****', substr(email, -4)) email
+    -> FROM customer;
+Query OK, 0 rows affected (4.34 sec)
+```
+
+Вы можете использовать любые предложения инструкции select при запросе данных через представление.
+
+```
+SELECT first_name, count(*), min(last_name), max(last_name)
+    -> FROM customer_vw
+    -> WHERE first_name LIKE 'J%'
+    -> GROUP BY first_name
+    -> HAVING count(*) > 1
+    -> ORDER BY 1;
+```
+Кроме того, в запросе вы можете соединять представления с другими таблицами (или даже с
+другими представлениями):
+
+```
+SELECT cv.first_name, cv.last_name, p.amount
+    -> FROM customer_vw cv
+    -> INNER JOIN payment p
+    -> ON cv.customer_id = p.customer_id
+    -> WHERE p.amount >= 11;
+```
+
+### Безопастность данных.
+Создаем представления только активных пользователей:
+```
+CREATE VIEW active_customer_vw
+    -> (customer_id,
+    -> first_name,
+    -> last_name,
+    -> email
+    -> )
+    -> AS
+    -> SELECT
+    -> customer_id,
+    -> first_name,
+    -> last_name,
+    -> concat(substr(email,1,2), '*****', substr(email, -4)) email
+    -> FROM customer
+    -> WHERE active = 1;
+Query OK, 0 rows affected (0.01 sec)
+```
+
+### Агрегация данных:
+
+```
+CREATE VIEW sales_by_film_category
+AS
+SELECT
+c.name AS category,
+SUM(p.amount) AS total_sales
+FROM payment AS p
+INNER JOIN rental AS r ON p.rental_id = r.rental_id
+INNER JOIN inventory AS i ON r.inventory_id = i.inventory_id
+INNER JOIN film AS f ON i.film_id = f.film_id
+INNER JOIN film_category AS fc ON f.film_id = fc.film_id
+INNER JOIN category AS c ON fc.category_id = c.category_id
+GROUP BY c.name
+ORDER BY total_sales DESC;
+```
+### Сокрытые сложности:
+
+```
+CREATE VIEW film_stats
+    -> AS
+    -> SELECT f.film_id, f.title, f.description, f.rating,
+    -> (SELECT c.name
+    -> FROM category c
+    -> INNER JOIN film_category fc
+    -> ON c.category_id = fc.category_id
+    -> WHERE fc.film_id = f.film_id) category_name,
+    -> (SELECT count(*)
+    -> FROM film_actor fa
+    -> WHERE fa.film_id = f.film_id
+    -> ) num_actors,
+    -> (SELECT count(*)
+    -> FROM inventory i
+    -> WHERE i.film_id = f.film_id
+    -> ) inventory_cnt,
+    -> (SELECT count(*)
+    -> FROM inventory i
+    -> INNER JOIN rental r
+    -> ON i.inventory_id = r.inventory_id
+    -> WHERE i.film_id = f.film_id
+    -> ) num_rentals
+    -> FROM film f;
+Query OK, 0 rows affected (0.01 sec)
+```
+
+### Обновление простых представлений.
+
+```
+mysql> UPDATE customer_vw
+-> SET last_name = 1
+SMITH-ALLEN'
+-> WHERE customer_id = 1;
+Query OK, 1 row affected (0.11 sec)
+Rows matched: 1 Changed: 1 Warnings: 0
+```
+```
+mysql> UPDATE customer_vw
+-> SET last_name = 1
+SMITH-ALLEN'
+-> WHERE customer_id = 1;
+Query OK, 1 row affected (0.11 sec)
+Rows matched: 1 Changed: 1 Warnings: 0
+```
+
+### Обновление сложных представлений.
+
+```
+CREATE VIEW customer_details
+    -> AS
+    -> SELECT c.customer_id,
+    -> c.store_id,
+    -> c.first_name,
+    -> c.last_name,
+    -> c.address_id,
+    -> c.active,
+    -> c.create_date,
+    -> a.address,
+    -> ct.city,
+    -> cn.country,
+    -> a.postal_code
+    -> FROM customer c
+    -> INNER JOIN address a
+    -> ON c.address_id = a.address_id
+    -> INNER JOIN city ct
+    -> ON a.city_id = ct.city_id
+    -> INNER JOIN country cn
+    -> ON ct.country_id = cn.country_id;
+Query OK, 0 rows affected (0.01 sec)
+```
+Это представление можно использовать для обновления данных в таблице
+customer или address, как показано в следующих инструкциях:
+
+
+Первая инструкция изменяет столбцы customer.last_name и customer.active.
+```
+mysql> UPDATE customer_details
+    -> SET last_name = 'SMITH-ALLEN', active = 0
+    -> WHERE customer_id = 1;
+Query OK, 0 rows affected (0.02 sec)
+Rows matched: 1  Changed: 0  Warnings: 0
+```
+В то время как вторая модифицирует слолбец address.address.
+```
+mysql> UPDATE customer_details
+    -> SET address = '999 Mockingbird Lane'
+    -> WHERE customer_id = 1;
+Query OK, 1 row affected (0.00 sec)
+Rows matched: 1  Changed: 1  Warnings: 0
+```
+# Глава 15. Метаданные. 
+
+Метаданные являются по существу данными о данных. 
+
+Например, если вам необходимо создать таблицу с несколькими столбцами.
+
+Сервер базы данных должен хранить следующую информацию.
+
+* Имя таблицы
+* Информация о хранении таблицы(Табличное пространствоб начальный размет и т.д.)
+* Механизм хранения
+* Имена столбцев
+* Типы данных столбцов
+* Значения столбцов по умолчанию
+* Ограничение not null для столбцев
+* Столюци первичного ключа
+* Имя первичного ключа
+* Имя индекса первичного ключа
+* Именя индексов
+* Типы индексов (B-tree, bitmap)
+* Индексированные столбцы
+* Порядок сортировки индексов столбцев( По возрастанию или по убыванию)
+* Информация о хранении индекса
+* Имя внешнего ключа
+* Столбцы внешнего ключа
+* Связанные таблициы/столбци для внешнего ключей
+
+Эти данные коллективно известны как ```словарь данных``` или ```системный каталог```.
+
+При наличии стандартов для обмена метаданными между разными серверами каждый сервер базы данных использует свой механизм для публикации метаданных. 
+
+* Набор представленийб таких как представленя user_tables и all_constraints в Oracle Database
+
+* Набор системных процедур, таких как процедура sp_tables в SQL Server или пакет
+dbms_metadata в Oracle Database.
+
+* Специальная база данныхб такая как бызы данных information_schema в MySQL
+
+
+## information_schema
+
+Пример демонстрирующий, как получить именя всех таблиц в базе данных Sakila.
+```
+SELECT table_name, table_type
+->  FROM information_schema.tables
+->  WHERE tables_schema = 'sakila'
+->  ORDER BY 1;
+```
+Если мы хотим исключить представления, просто необходимо добавить эту сточку в усливие.
+```
+SELECT table_name, table_type
+    -> FROM information_schema.tables
+    -> WHERE table_schema = 'sakila'
+    -> AND table_type = 'BASE TABLE'
+    -> ORDER BY 1;
+```
+Получаем только представления 
+```
+SELECT table_name, is_updatable
+    -> FROM information_schema.views
+    -> WHERE table_schema = 'sakila'
+    -> ORDER BY 1;
+```
+Следующий запрос показывает информацию о столбцах таблици film.
+
+```
+SELECT column_name, data_type,
+    -> character_maximum_length char_max_len,
+    -> numeric_precision num_prcsn, numeric_scale num_scale
+    -> FROM information_schema.columns
+    -> WHERE table_schema = 'sakila' AND table_name = 'film'
+    -> ORDER BY ordinal_position;
+```
+Вы можете получить информацию об индексах таблицы с помощью представления
+information_schema.statistics
+
+```
+SELECT index_name, non_unique, seq_in_index, column_name
+    -> FROM information_schema.statistics
+    -> WHERE table_schema = 'sakila' AND table_name = 'rental'
+    -> ORDER BY 1, 3;
+```
+Вы можете получить различные типы ограничений (внешнего ключа,
+первичного ключа, уникальный) с помощью представления information_
+schema.table_constraints. Вот запрос, который извлекает все ограничения из схемы Sakila:
+
+```
+SELECT constraint_name, table_name, constraint_type
+    -> FROM information_schema.table_constraints
+    -> WHERE table_schema = 'sakila'
+    -> ORDER BY 3,1;
+```
+
+### Проверка базы данных
+
+Вот запрос который возвращает количествостолбцев, количество индексов и количество
+ограничений первичного ключа (0 или 1) для каждой таблици в схеме Sakila:
+
+```
+ SELECT tb1.table_name,
+    -> (SELECT count(*) FROM information_schema.columns clm
+    -> WHERE clm.table_schema = tb1.table_schema
+    -> AND clm.table_name = tb1.table_name) num_columns,
+    -> (SELECT count(*) FROM information_schema.statistics sta
+    -> WHERE sta.table_schema = tb1.table_schema
+    -> AND sta.table_name = tb1.table_name) num_indexes,
+    -> (SELECT count(*) FROM information_schema.table_constraints tc
+    -> WHERE tc.table_schema = tb1.table_schema
+    -> AND tc.table_name = tb1.table_name
+    -> AND tc.constraint_type = 'PRIMARY KEY') num_primary_keys
+    -> FROM information_schema.tables tb1
+    -> WHERE tb1.table_schema = 'sakila'
+    -> AND tb1.table_type = 'BASE TABLE'
+    -> ORDER BY 1;
+```
+
+### Динамическая генерация SQL:
+
+```
+SET @qry =
+    'SELECT customer_id, first_bname, last_name FROM customer';
+```
+```
+PRYPARE dynsql1 FROM @qry;
+Query OK, 0 rows affected (0.00 sec)
+Statement prepared
+```
+```
+EXECUTE dynsql1;
+```
+
+# Глава 16ю Аналичитеские функции.
+
+### Концепции аналитических функций
+
+```
+SELECT quarter(payment_date) quarter,
+    -> monthname(payment_date) month_nm,
+    -> sum(amount) monthly_sales,
+    -> max(sum(amount))
+    -> over () max_overal1_sales,
+    -> max(sum(amount))
+    -> over (partition by quarter(payment_date)) max_qrtr_sales
+    -> FROM payment
+    -> WHERE year(payment_date) = 2005
+    -> GROUP BY quarter(payment_date), monthname(payment_date);
+```
+
+### Локализированная сортировка.
+```
+SELECT quarter(payment_date) quarter,
+    -> monthname(payment_date) month_nm,
+    -> sum(amount) monthly_sates,
+    -> rank() over (order by sum(amount) desc) sales_rank
+    -> FROM payment
+    -> WHERE year(payment_date) = 2005
+    -> GROUP BY quarter(payment_date), monthname(payment_date)
+    -> ORDER BY 1, month(payment_date);
+```
+
+```
+ SELECT quarter(payment_date) quarter,
+    -> monthname(payment_date) month_nm,
+    -> sum(amount) monthly_sales,
+    -> rank() over (partition by quarter(payment_date)
+    -> order by sum(amount) desc) qtr_sqles_rank
+    -> FROM payment
+    -> WHERE year(payment_date) = 2005
+    -> GROUP BY quarter(payment_date), monthname(payment_date)
+    -> ORDER BY 1, month(payment_date);
+```
+Эти примеры были разработаны, чтобы проиллюстрировать использование предложения over;
+в следующих разделах будут подробно описаны различные аналитические функции.
+
+### Ранжирование. Функции ранжирования.
+```
+SELECT customer_id, count(*) num_rentals,
+    -> row_number() over (order by count(*) desc) row_number_rnk,
+    -> rank() over (order by count(*) desc) rank_rnk,
+    -> dense_rank() over (order by count(*) desc) dense_rank_rnk
+    -> FROM rental
+    -> GROUP BY customer_id
+    -> ORDER BY 2 desc;
+```
+### Генерация нескольких рейтингов.
+
+```
+SELECT customer_id,
+->  monthname (rental_date) rental_month,
+->  count(*) num_rentals
+-> FROM rental
+-> GROUP BY customer_id, monthname (rental_date)
+-> ORDER BY 2, 3 desc;
+```
+Для того чтобы каждый месяц создавать новый набор рейтингов, нужно
+добавить в функцию rank нечто, описывающее, как разделить результирующий набор на различные
+окна данных (в нашем случае — месяцы).
+```
+SELECT customer_id,
+->  monthname(rental_date) rental_month,
+->  count(*) num_rentals,
+->  rank() over (partition by monthname (rental_date)
+->  order by count(*) desc) rank_rnk
+-> FROM rental
+-> GROUP BY customer_id, monthname(rental_date)
+-> ORDER BY 2, 3 desc;
+```
+### Функции отчетности.
+```
+SELECT monthname(payment_date) payment_month,
+    -> amount,
+    -> sum(amount)
+    -> over (partition by monthname(payment_date)) monthly_total,
+    -> sum(amount) over () grand_total
+    -> FROM payment
+    -> WHERE amount >= 10
+    -> ORDER BY 1;
+```
+Функции отчетности также могут быть использованы для сравнений:
+```
+ SELECT monthname(payment_date) payment_month,
+    -> sum(amount) month_total,
+    -> CASE sum(amount)
+    -> WHEN max(sum(amount)) over () THEN 'Highest'
+    -> WHEN max(sum(amount)) over () THEN 'Lowest'
+    -> ELSE 'Middle'
+    -> END descriptor
+    -> FROM payment
+    -> GROUP BY monthname(payment_date);
+```
+
+### Рамки окон.
+```
+SELECT yearweek(payment_date) payment_week,
+    -> sum(amount) week_total,
+    -> sum(sum(amount))
+    -> over (order by yearweek(payment_date)
+    -> rows unbounded preceding) rolling_sum
+    -> FROM payment
+    -> GROUP BY yearweek(payment_date)
+    -> ORDER BY 1;
+```
+
+```
+ SELECT yearweek(payment_date) payment_week,
+    -> sum(amount) week_total,
+    -> avg(sum(amount))
+    -> over (order by yearweek(payment_date)
+    -> rows between 1 preceding and 1 following) rolling_3wk_avg
+    -> FROM payment
+    -> GROUP BY yearweek(payment_date)
+    -> ORDER BY 1;
+```
+
+```
+ SELECT date(payment_date), sum(amount),
+    -> avg(sum(amount)) over (order by date(payment_date)
+    -> range between interval 3 day preceding
+    -> and interval 3 day following) 7_day_avg
+    -> FROM payment
+    -> WHERE payment_date BETWEEN '2005-07-01' AND '2005-09-01'
+    -> GROUP BY date(payment_date)
+    -> ORDER BY 1;
+```
+
+### Запаздывание и опережение.
+
+```
+SELECT yearweek(payment_date) payment_week,
+    -> sum(amount) week_total,
+    -> lag(sum(amount), 1)
+    -> over (order by yearweek(payment_date)) prev_wk_tot,
+    -> lead(sum(amount), 1)
+    -> over (order by yearweek(payment_date)) next_wk_tot
+    -> FROM payment
+    -> GROUP BY yearweek(payment_date)
+    -> ORDER BY 1;
+```
+```
+SELECT yearweek(payment_date) payment_week,
+    -> sum(amount) week_total,
+    -> round((sum(amount) - lag(sum(amount), 1)
+    -> over (order by yearweek(payment_date)))
+    -> / lag(sum(amount), 1)
+    -> over (order by yearweek(payment_date))
+    -> * 100, 1) pct_diff
+    -> FROM payment
+    -> GROUP BY yearweek(payment_date)
+    -> ORDER BY 1;
+```
+
+### Конкатенация значений в столбце.
+
+```
+SELECT f.title,
+    -> group_concat(a.last_name order by a.last_name
+    -> separator ', ') actors
+    -> FROM actor a
+    -> INNER JOIN film_actor fa
+    -> ON a.actor_id = fa.actor_id
+    -> INNER JOIN film f
+    -> ON fa.film_id = f.film_id
+    -> GROUP BY f.title
+    -> HAVING count(*) = 3;
+```
+Этот запрос группирует строки по названию фильма и включает только те
+фильмы, в которых указаны ровно три актера
+
+
+
+# Глава 17. Работа с большими базами данных.
+
+## Секционировани.
+
+### Концепции секционирования.
+
+* Разделы могут храниться в разных табличных пространствах, которые могут
+находится в различных физичиских хранилищах.
+
+* Разделы могут быть сжаты с использованием различных схем сжатия.
+
+* Локальные индексы для некоторых разделов могут отсутствовать.
+
+* Статистика таблицы для некоторых разделов может быть заморожена,
+при этом переодически обновляясь для других.
+
+* Отдельный разделы могут быть закрепленны в памяти или храниться во флеш-хранилище.
+
+### Секционирование по списку.
+
+```
+CREATE TABLE sales
+    -> (sale_id INT NOT NULL,
+    -> cust_id INT NOT NULL,
+    -> store_id INT NOT NULL,
+    -> sale_date DATE NOT NULL,
+    -> geo_region_cd VARCHAR(6) NOT NULL,
+    -> amount DECIMAL(9,2)
+    -> )
+    -> PARTITION BY LIST COLUMNS (geo_region_cd)
+    -> (PARTITION NORTHAMERICA VALUES IN ('US_NE', 'US_SE', 'US_MW',
+    -> 'US_NW', 'US_SW', 'CAN', 'MEX'),
+    -> PARTITION EUROPE VALUES IN ('EUR_E', 'EUR_W'),
+    -> PARTITION ASIA VALUES IN ('CHN', 'JPN', 'IND')
+    -> );
+```
+```
+ALTER TABLE sales REORGANIZE PARTITION ASIA INTO
+    -> (PARTITION ASIA VALUES IN ('CHN', 'JPN', 'IND', 'KOR'));
+Query OK, 0 rows affected (0.02 sec)
+```
+```
+INSERT INTO sales
+    -> VALUES
+    -> (1, 1, 1, '2020-01-18', 'US_NE', 2765.15),
+    -> (2, 3, 4, '2020-01-07', 'CAN', 5322.08),
+    -> (3, 6, 27, '2020-03-11', 'KOR', 4267.12);
+Query OK, 3 rows affected (0.00 sec)
+```
+### Секционирование по хешу.
+
+```
+SELECT concat('# of rows in H1 = ', count(*))
+partition_rowcount
+-> FROM sales PARTITION (h1) UNION ALL
+-> SELECT concat('# of rows in H2 = ', count(*))
+partition_rowcount
+-> FROM sales PARTITION (h2) UNION ALL
+-> SELECT concat('# of rows in H3 = ', count(*))
+partition_rowcount
+-> FROM sales PARTITION (h3) UNION ALL
+-> SELECT concat('# of rows in H4 = ', count(*))
+partition_rowcount
+-> FROM sales PARTITION (h4);
+```
+
+### Композиционное секционирование.
+административное преимущество секционированных таблиц — способность
+выполнять обновления в нескольких разделах одновременно, что может
+значительно сократить время, необходимое для работы со
+всеми строками таблицы.
+
+END...
